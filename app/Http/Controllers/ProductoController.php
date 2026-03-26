@@ -2,84 +2,107 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Producto;
-use App\Models\Categoria; 
 use Illuminate\Http\Request;
-use App\Http\Requests\ProductoRequest; 
-use Illuminate\Support\Facades\Storage;
+use App\Models\Producto;
+use App\Models\User; 
+use App\Notifications\ProductoCreado;
+use App\Notifications\StockBajoDB;
+use Illuminate\Support\Facades\Notification;
 
 class ProductoController extends Controller
 {
-    // 1. EL MÉTODO QUE TE FALTABA
-    public function index(Request $request)
+    /**
+     * Lista de productos (Soluciona el error de index)
+     */
+    public function index()
     {
-        $search = $request->input('search');
-        
-        $productos = Producto::query()
-            ->when($search, function($query, $search) {
-                return $query->search($search);
-            })
-            ->paginate(10);
-
-        return view('productos.index', compact('productos', 'search'));
+        $productos = Producto::paginate(10);
+        return view('productos.index', compact('productos'));
     }
 
-    // 2. MÉTODO CREATE
+    /**
+     * Formulario para crear nuevo producto
+     */
     public function create()
     {
-        $categorias = Categoria::all();
-        return view('productos.create', compact('categorias'));
+        return view('productos.create');
     }
 
-    // 3. MÉTODO STORE (Corregido)
-    public function store(ProductoRequest $request)
+    /**
+     * Paso 3: Guardar y enviar notificación de creación
+     */
+    public function store(Request $request) 
     {
-        $data = $request->validated();
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'precio' => 'required|numeric',
+            'stock'  => 'required|integer',
+        ]);
 
-        if ($request->hasFile('imagen')) {
-            $data['imagen'] = $request->file('imagen')->store('productos', 'public');
+        $producto = Producto::create($validated);
+
+        // Notificar a administradores
+        $admins = User::where('rol', 'admin')->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new ProductoCreado($producto));
         }
 
-        Producto::create($data); 
         return redirect()->route('productos.index')
-                         ->with('success', 'Producto creado exitosamente.');
+            ->with('success', 'Producto registrado y admins notificados.');
     }
 
-    // 4. MÉTODO EDIT
-    public function edit(string $id)
+    /**
+     * Detalle del producto (necesario para el link del Paso 2)
+     */
+    public function show($id)
     {
         $producto = Producto::findOrFail($id);
-        $categorias = Categoria::all();
-        return view('productos.edit', compact('producto', 'categorias'));
+        return view('productos.show', compact('producto'));
     }
 
-    // 5. MÉTODO UPDATE (Corregido)
-    public function update(ProductoRequest $request, string $id)
+    /**
+     * Formulario de edición
+     */
+    public function edit($id)
     {
         $producto = Producto::findOrFail($id);
-        $data = $request->validated();
+        return view('productos.edit', compact('producto'));
+    }
 
-        if ($request->hasFile('imagen')) {
-            if ($producto->imagen) {
-                Storage::disk('public')->delete($producto->imagen);
+    /**
+     * Paso 6: Actualizar y enviar notificación de Stock Bajo
+     */
+    public function update(Request $request, $id)
+    {
+        $producto = Producto::findOrFail($id);
+
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'precio' => 'required|numeric',
+            'stock'  => 'required|integer',
+        ]);
+
+        $producto->update($validated);
+
+        // Si el stock baja de 5, notificamos
+        if ($producto->stock < 5) {
+            $admins = User::where('rol', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new StockBajoDB($producto));
             }
-            $data['imagen'] = $request->file('imagen')->store('productos', 'public');
         }
 
-        $producto->update($data); 
         return redirect()->route('productos.index')
-                         ->with('success', 'Producto actualizado correctamente.');
+            ->with('success', 'Producto actualizado correctamente.');
     }
 
-    // 6. MÉTODO DESTROY
-    public function destroy(string $id)
+    /**
+     * Eliminar producto
+     */
+    public function destroy($id)
     {
         $producto = Producto::findOrFail($id);
-        if ($producto->imagen) {
-            Storage::disk('public')->delete($producto->imagen);
-        }
         $producto->delete();
-        return redirect()->route('productos.index')
-                         ->with('success', 'Producto eliminado.');
+        return redirect()->route('productos.index')->with('success', 'Producto eliminado.');
     }
 }

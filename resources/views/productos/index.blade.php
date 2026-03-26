@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Productos - Práctica 8</title>
+    <title>Gestión de Productos - Reportes</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
         .container { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
@@ -17,9 +17,18 @@
 
         h1 { color: #2c3e50; font-size: 22px; margin: 15px 0; border-bottom: 2px solid #f1f3f5; padding-bottom: 10px; }
 
+        /* --- NUEVOS ESTILOS PARA REPORTES (PRACTICA 11) --- */
+        .reports-bar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-report { padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-flex; align-items: center; transition: 0.3s; }
+        .btn-pdf { background-color: #e74c3c; color: white; border: 1px solid #c0392b; }
+        .btn-pdf:hover { background-color: #c0392b; }
+        .btn-excel { background-color: #27ae60; color: white; border: 1px solid #219150; }
+        .btn-excel:hover { background-color: #219150; }
+        /* -------------------------------------------------- */
+
         /* Buscador y Nuevo */
         .actions-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px; }
-        .btn-crear { background: #27ae60; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; white-space: nowrap; }
+        .btn-crear { background: #34495e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; white-space: nowrap; }
         
         .search-box { flex-grow: 1; display: flex; background: #f8f9fa; padding: 8px; border-radius: 8px; border: 1px solid #ddd; align-items: center; gap: 8px; }
         .search-input { border: none; background: transparent; padding: 8px; flex-grow: 1; outline: none; font-size: 14px; }
@@ -33,8 +42,7 @@
         td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; color: #333; vertical-align: middle; }
         tr:hover { background-color: #fcfcfc; }
         
-        /* Estilos de Imagen en Tabla */
-        .img-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .img-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; }
         .no-img { font-size: 11px; color: #95a5a6; font-style: italic; }
 
         .price { font-weight: bold; color: #27ae60; }
@@ -47,26 +55,6 @@
         /* Paginación */
         .pagination-container { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .results-text { font-size: 13px; color: #7f8c8d; }
-        .pagination-container nav p { display: none !important; } 
-        .pagination-container nav svg { width: 16px; height: 16px; } 
-        .pagination-container nav div { display: flex; align-items: center; justify-content: center; }
-        .pagination-container nav div span, .pagination-container nav div a {
-            padding: 5px 10px !important;
-            font-size: 13px !important;
-            border: 1px solid #dee2e6 !important;
-            margin: 0 2px;
-            border-radius: 4px !important;
-            text-decoration: none !important;
-            display: inline-flex;
-            align-items: center;
-        }
-        .pagination-container nav div span[aria-current="page"] {
-            background-color: #3498db !important;
-            color: white !important;
-            border-color: #3498db !important;
-        }
-        .pagination-container nav > div:first-child { display: none !important; }
-        .pagination-container nav > div:last-child { display: flex !important; }
     </style>
 </head>
 <body>
@@ -74,13 +62,25 @@
 <div class="container">
     <div class="header-top">
         <div class="user-info">
-            Bienvenido, <strong>{{ auth()->user()->name ?? 'Zuriel Flores' }}</strong> 
-            <span class="role-badge">ADMIN</span>
+            Bienvenido, <strong>{{ auth()->user()->name }}</strong> 
+            <span class="role-badge">{{ strtoupper(auth()->user()->rol) }}</span>
         </div>
         <a href="{{ route('logout') }}" class="btn-logout">Cerrar Sesión</a>
     </div>
 
-    <h1>Gestión de Productos (Práctica 8 - Imágenes)</h1>
+    <h1>Gestión de Productos y Reportes</h1>
+
+    {{-- BLOQUE DE BOTONES DE REPORTE (PRACTICA 11) --}}
+    @auth
+    <div class="reports-bar">
+        <a href="{{ route('reportes.pdf') }}" class="btn-report btn-pdf">
+            📄 Exportar PDF
+        </a>
+        <a href="{{ route('reportes.excel') }}" class="btn-report btn-excel">
+            📊 Exportar Excel
+        </a>
+    </div>
+    @endauth
 
     <div class="actions-bar">
         @if(auth()->user()->rol === 'admin')
@@ -127,7 +127,7 @@
                     <a href="{{ route('productos.edit', $producto->id) }}" class="link-edit">Editar</a>
                     <form action="{{ route('productos.destroy', $producto->id) }}" method="POST" style="display:inline;">
                         @csrf @method('DELETE')
-                        <button type="submit" class="link-delete" onclick="return confirm('¿Eliminar este producto permanentemente?')">Eliminar</button>
+                        <button type="submit" class="link-delete" onclick="return confirm('¿Eliminar este producto?')">Eliminar</button>
                     </form>
                 </td>
                 @endif
@@ -146,7 +146,7 @@
         @endif
         
         <div class="mini-pagination">
-            {{ $productos->appends(['search' => $search])->links() }}
+            {{ $productos->appends(['search' => $search ?? ''])->links() }}
         </div>
     </div>
 </div>
